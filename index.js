@@ -1,7 +1,11 @@
 const express = require('express')
+const morgan = require('morgan')
 const app = express()
 
+const morganLogger = morgan('tiny', { skip: req => req.method === 'POST' })
+
 app.use(express.json())
+app.use(morganLogger)
 
 let persons = [
     {

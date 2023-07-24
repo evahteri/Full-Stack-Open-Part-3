@@ -108,9 +108,9 @@ app.post('/api/persons', (request, response) => {
     console.log(id)
 
     const person = {
+        id: id,
         name: body.name,
         number: body.number,
-        id: id
     }
 
     persons = persons.concat(person)

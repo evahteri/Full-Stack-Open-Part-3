@@ -2,11 +2,15 @@ require('dotenv').config()
 const express = require('express')
 const morgan = require('morgan')
 const cors = require('cors')
-const app = express()
 const Person = require('./models/person')
 
-morgan.token('body', req => JSON.stringify(req.body))
+const app = express()
+
+app.use(express.json())
 app.use(cors())
+app.use(express.static('build'))
+
+morgan.token('body', req => JSON.stringify(req.body))
 
 const morganLogger = morgan('tiny', { skip: req => req.method === 'POST' })
 
@@ -14,45 +18,8 @@ const morganPOSTLogger = morgan(':method :url :status :res[content-length] - :re
     skip: req => req.method !== 'POST'
 })
 
-app.use(express.static('build'))
-app.use(express.json())
 app.use(morganLogger)
 app.use(morganPOSTLogger)
-
-
-const errorHandler = (error, request, response, next) => {
-    console.error(error.message)
-  
-    if (error.name === 'CastError') {
-      return response.status(400).send({ error: 'malformatted id' })
-    }
-  
-    next(error)
-  }
-  
-
-let persons = [
-    {
-        id: 1,
-        name: "Arto Hellas",
-        number: "040-123456"
-      },
-      {
-        id: 2,
-        name: "Ada Lovelace",
-        number: "39-44-5323523"
-      },
-      {
-        id: 3,
-        name: "Dan Abramov",
-        number: "12-43-234345"
-      },
-      {
-        id: 4,
-        name: "Mary Poppendick",
-        number: "39-23-6423122"
-      }
-]
 
 
 app.get('/api/persons', (req, res) => {
@@ -62,8 +29,7 @@ app.get('/api/persons', (req, res) => {
 })
 
 app.get('/api/persons/:id', (request, response, next) => {
-    const id = Number(request.params.id)
-    const person = Person.findById({id}).then(
+    Person.findById(request.params.id).then(
         person => {
             if (person) {
                 response.json(person)
@@ -87,11 +53,23 @@ const countItems = () => {
     return persons.length
 }
 
-app.get('/info', (req, res) => {
-    amount = countItems()
-    currentDate = new Date()
-    res.send(`<p>Phonebook has info for ${amount} people</p>
-    <p>${currentDate}</p>`)
+app.get('/info', (request, response) => {
+    Person.find({}).then(people => {
+        const amount = people.length
+        const currentTime = new Date()
+        response.send(`<p>Phonebook has info for ${amount} people.</p> <br>
+        ${currentTime}`)
+    })
+})
+
+app.put('/api/persons/:id', (request, response, next) => {
+    const { name, number } = request.body
+
+    Person.findByIdAndUpdate(request.params.id, { name, number }, {new: true, runValidators: true, context: 'query'}).then(
+        updatedPerson => {
+            response.json(updatedPerson)
+        }
+    ).catch(error => next(error))
 })
 
 app.post('/api/persons', (request, response) => {
@@ -109,17 +87,6 @@ app.post('/api/persons', (request, response) => {
           error: 'number missing' 
         })
       }
-    
-    /*
-    
-    const oldName = persons.find(person => person.name === body.name)
-    if (oldName) {
-        return response.status(400).json({ 
-          error: 'name must be unique' 
-        })
-      }
-    
-    */
 
     const person = new Person({
         name: body.name,
@@ -137,6 +104,18 @@ const unknownEndpoint = (request, response) => {
   }
   
 app.use(unknownEndpoint)
+
+const errorHandler = (error, request, response, next) => {
+    console.error(error.message)
+  
+    if (error.name === 'CastError') {
+      return response.status(400).send({ error: 'malformatted id' })
+    }
+  
+    next(error)
+  }
+  
+
 app.use(errorHandler)
 
 const PORT = process.env.PORT

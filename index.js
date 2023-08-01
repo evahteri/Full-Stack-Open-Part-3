@@ -1,7 +1,9 @@
+require('dotenv').config()
 const express = require('express')
 const morgan = require('morgan')
 const cors = require('cors')
 const app = express()
+const Person = require('./models/person')
 
 morgan.token('body', req => JSON.stringify(req.body))
 app.use(cors())
@@ -12,10 +14,22 @@ const morganPOSTLogger = morgan(':method :url :status :res[content-length] - :re
     skip: req => req.method !== 'POST'
 })
 
+app.use(express.static('build'))
 app.use(express.json())
 app.use(morganLogger)
 app.use(morganPOSTLogger)
-app.use(express.static('build'))
+
+
+const errorHandler = (error, request, response, next) => {
+    console.error(error.message)
+  
+    if (error.name === 'CastError') {
+      return response.status(400).send({ error: 'malformatted id' })
+    }
+  
+    next(error)
+  }
+  
 
 let persons = [
     {
@@ -42,26 +56,30 @@ let persons = [
 
 
 app.get('/api/persons', (req, res) => {
-    res.json(persons)
+    Person.find({}).then(people => {
+        res.json(people)
+    })
 })
 
-app.get('/api/persons/:id', (request, response) => {
+app.get('/api/persons/:id', (request, response, next) => {
     const id = Number(request.params.id)
-    const person = persons.find(person => person.id === id)
-    if (person) {
-        response.json(person)
-    } else {
-        response.status(404).end()
-    }
-}
-)
+    const person = Person.findById({id}).then(
+        person => {
+            if (person) {
+                response.json(person)
+            } else {
+                response.status(404).end()
+            }
+        }
+    ).catch(error => next(error))
+})
 
-app.delete('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    console.log(id)
-    persons = persons.filter(person => person.id !== id)
-
-    response.status(204).end()
+app.delete('/api/persons/:id', (request, response, next) => {
+    Person.findByIdAndRemove(request.params.id).then(
+        result => {
+            response.status(204).end()
+        }
+    ).catch(error => next(error))
 }
 )
 
@@ -75,11 +93,6 @@ app.get('/info', (req, res) => {
     res.send(`<p>Phonebook has info for ${amount} people</p>
     <p>${currentDate}</p>`)
 })
-
-const generateId = () => {
-    const number = Math.floor(Math.random()*1000)
-    return number
-}
 
 app.post('/api/persons', (request, response) => {
     const body = request.body
@@ -97,30 +110,36 @@ app.post('/api/persons', (request, response) => {
         })
       }
     
+    /*
+    
     const oldName = persons.find(person => person.name === body.name)
     if (oldName) {
         return response.status(400).json({ 
           error: 'name must be unique' 
         })
       }
+    
+    */
 
-    const id = generateId()
-    console.log(id)
-
-    const person = {
-        id: id,
+    const person = new Person({
         name: body.name,
         number: body.number,
-    }
+    })
 
-    persons = persons.concat(person)
-
-    response.json(person)
+    person.save().then(savedPerson => {
+        response.json(savedPerson)
+    }).catch(error => next(error))
 }
+
 )
+const unknownEndpoint = (request, response) => {
+    response.status(404).send({ error: 'unknown endpoint' })
+  }
+  
+app.use(unknownEndpoint)
+app.use(errorHandler)
 
-
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
 })

@@ -31,19 +31,19 @@ const person = new Person({
 })
 
 if (!personName && !personNumber) {
-    Person.find({}).then(result => {
-        console.log('phonebook:')
-        result.forEach(person => {
-          console.log(`${person.name} ${person.number}`)
-        })
-        mongoose.connection.close()
-      })
+  Person.find({}).then(result => {
+    console.log('phonebook:')
+    result.forEach(person => {
+      console.log(`${person.name} ${person.number}`)
+    })
+    mongoose.connection.close()
+  })
 }
 
 if (personName && personNumber) {
-    person.save().then(result => {
-        console.log(personName, personNumber)
-      console.log(`Added ${personName} ${personNumber} to phonebook`)
-      mongoose.connection.close()
-    })
+  person.save().then(() => {
+    console.log(personName, personNumber)
+    console.log(`Added ${personName} ${personNumber} to phonebook`)
+    mongoose.connection.close()
+  })
 }
